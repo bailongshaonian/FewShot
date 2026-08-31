@@ -1,0 +1,339 @@
+======================================================================
+White-Box Baseline
+======================================================================
+Seed: 42
+Device: cuda
+Model: Randomly Initialized ResNet18
+Classifier: Linear
+Data Augmentation: RandAugment
+Num Classes: 100
+K-shot: 20
+Batch Size: 128
+Epochs: 100
+Learning Rate: 0.05
+Momentum: 0.9
+Weight Decay: 0.0005
+Train Size: 2000
+Validation Size: 3000
+Test Size: 55000
+Best Validation Accuracy: 29.03%
+Best Epoch: 95
+Test Accuracy: 28.51%
+======================================================================
+
+======================================================================
+Data-level Prior Baseline
+======================================================================
+Experiment: data_baseline_pretrained_resnet18
+Seed: 42
+Device: cuda
+Model: ImageNet Pretrained ResNet18
+Classifier: Linear
+Pretrained Weights: models\resnet18_pretrained.pth
+Data Augmentation: RandomResizedCrop + RandomHorizontalFlip + RandAugment
+Num Classes: 100
+K-shot: 20
+Batch Size: 128
+Epochs: 100
+Learning Rate: 0.05
+Momentum: 0.9
+Weight Decay: 0.0005
+Train Size: 2000
+Validation Size: 3000
+Test Size: 55000
+Best Validation Accuracy: 67.30%
+Best Epoch: 85
+Test Accuracy: 67.35%
+
+======================================================================
+Data-level Prior Baseline
+======================================================================
+Experiment: data_baseline_frozen_pretrained_resnet18
+Seed: 42
+Device: cuda
+Model: ImageNet Pretrained ResNet18
+Backbone: Frozen
+Classifier: Linear
+Pretrained Weights: models\resnet18_pretrained.pth
+Data Augmentation: RandomResizedCrop + RandomHorizontalFlip + RandAugment
+Num Classes: 100
+K-shot: 20
+Batch Size: 128
+Epochs: 100
+Learning Rate: 0.05
+Momentum: 0.9
+Weight Decay: 0.0005
+Train Size: 2000
+Validation Size: 3000
+Test Size: 55000
+Best Validation Accuracy: 86.33%
+Best Epoch: 60
+Test Accuracy: 87.28%
+
+======================================================================
+Model-level Baseline
+======================================================================
+Experiment: model_baseline_frozen_pretrained_protonet
+Seed: 42
+Device: cuda
+Model: ImageNet Pretrained ResNet18
+Backbone: Frozen
+Embedding Dimension: 512
+Classifier: Prototypical Network
+Distance Metric: Squared Euclidean Distance
+Pretrained Weights: models\resnet18_pretrained.pth
+Num Classes: 100
+K-shot: 20
+Support Transform: Resize + CenterCrop + Normalize
+Query Transform: Resize + CenterCrop + Normalize
+Support Size: 2000
+Validation Size: 3000
+Test Size: 55000
+Validation Accuracy: 85.83%
+Test Accuracy: 86.44%
+Training Epochs: 0
+Episodic Meta-training: No
+
+======================================================================
+From-scratch ProtoNet Baseline
+======================================================================
+Experiment: from_scratch_protonet
+Seed: 42
+Device: cuda
+Model: Randomly Initialized ResNet18
+Backbone: Trainable
+Embedding Dimension: 512
+Classifier: Prototypical Network
+Distance Metric: Squared Euclidean Distance
+Pretrained Weights: None
+N-way: 5
+N-shot: 5
+N-query: 10
+Episodes per Epoch: 100
+Epochs: 100
+Episodic Meta-training: Yes
+Learning Rate: 0.001
+Weight Decay: 0.0005
+Train Size: 2000
+Validation Size: 3000
+Test Size: 55000
+Best Validation Accuracy: 23.50%
+Best Epoch: 93
+Test Accuracy: 22.08%
+
+======================================================================
+Foundation Model Zero-shot Baseline
+======================================================================
+Experiment: clip_zero_shot
+Seed: 42
+Device: cuda
+Model: OpenAI CLIP ViT-B/32
+Model Path: models\vit-b-32.pt
+Model Type: Vision-Language Foundation Model
+Training Mode: Zero-shot Inference
+Backbone Frozen: Yes
+Fine-tuning: No
+Prompt Template: "a photo of a {}"
+Training Samples Used: 0
+Support Set Used: No
+Validation Used for Model Selection: No
+Test Set Used for Training: No
+Num Classes: 100
+Validation Size: 3000
+Test Size: 55000
+Validation Accuracy: 82.40%
+Validation Mean Class Accuracy: 82.40%
+Test Accuracy: 83.75%
+Test Mean Class Accuracy: 83.75%
+
+======================================================================
+CLIP Linear Probe Baseline
+======================================================================
+Experiment: clip_linear_probe
+Seed: 42
+Device: cuda
+Backbone: OpenAI CLIP ViT-B/32
+Model Path: models\vit-b-32.pt
+Backbone Frozen: Yes
+Fine-tuning CLIP Backbone: No
+Image Feature Dimension: 512
+Classifier: Linear
+Classifier Training: Yes
+Num Classes: 100
+K-shot: 20
+Epochs: 100
+Batch Size: 64
+Learning Rate: 0.001
+Weight Decay: 0.0001
+Evaluation Frequency: 5
+Train Size: 2000
+Validation Size: 3000
+Test Size: 55000
+Best Validation Accuracy: 88.13%
+Best Epoch: 65
+Validation Mean Class Accuracy: 88.13%
+Test Accuracy: 88.65%
+Test Mean Class Accuracy: 88.65%
+
+======================================================================
+Knowledge-Enhanced Hard Prompt Zero-shot
+======================================================================
+Experiment: clip_hard_prompt_zero_shot
+Seed: 42
+Device: cuda
+Model: OpenAI CLIP ViT-B/32
+Model Path: models\vit-b-32.pt
+Training Mode: Zero-shot Inference
+Backbone Frozen: Yes
+Fine-tuning: No
+Prompt Type: Knowledge-Enhanced Hard Prompt
+Prompt Template: "a photo of a {class_name}, {description}"
+External Knowledge: WordNet Definition
+Training Samples Used: 0
+Support Set Used: No
+Parameter Optimization: No
+Num Classes: 100
+Validation Size: 3000
+Test Size: 55000
+Validation Accuracy: 86.20%
+Validation Mean Class Accuracy: 86.20%
+Test Accuracy: 86.98%
+Test Mean Class Accuracy: 86.98%
+
+======================================================================
+CLIP CoOp Baseline
+======================================================================
+Experiment: clip_coop
+Seed: 42
+Device: cuda
+Backbone: OpenAI CLIP ViT-B/32
+Model Path: models\vit-b-32.pt
+CLIP Image Encoder Frozen: Yes
+CLIP Text Encoder Frozen: Yes
+Method: CoOp-style Prompt Tuning
+Context Tokens: 4
+Context Initialization: "a photo of a"
+Prompt Type: Continuous Learnable Context
+Learnable Parameters: Context Only
+Trainable Parameters: 2048
+Num Classes: 100
+K-shot: 20
+Train Size: 2000
+Validation Size: 3000
+Test Size: 55000
+Epochs: 100
+Batch Size: 64
+Learning Rate: 0.002
+Weight Decay: 0.0001
+Evaluation Frequency: 5
+Best Validation Accuracy: 88.50%
+Best Epoch: 10
+Final Validation Accuracy: 88.50%
+Validation Mean Class Accuracy: 88.50%
+Test Accuracy: 88.93%
+Test Mean Class Accuracy: 88.93%
+
+======================================================================
+CLIP Tip-Adapter Baseline
+======================================================================
+Experiment: clip_tip_adapter
+Seed: 42
+Device: cuda
+Backbone: OpenAI CLIP ViT-B/32
+Model Path: models\vit-b-32.pt
+CLIP Image Encoder Frozen: Yes
+CLIP Text Encoder Frozen: Yes
+Method: Tip-Adapter
+Variant: Training-free
+Cache Type: Image Feature Key-Value Cache
+Alpha: 1.0
+Beta: 5.0
+Backpropagation: No
+Parameter Fine-tuning: No
+Prompt Template: "a photo of a {}"
+Num Classes: 100
+K-shot: 20
+Train Size: 2000
+Validation Size: 3000
+Test Size: 55000
+Validation Accuracy: 85.73%
+Validation Mean Class Accuracy: 85.73%
+Test Accuracy: 86.67%
+Test Mean Class Accuracy: 86.67%
+
+======================================================================
+CLIP LoRA Baseline
+======================================================================
+Experiment: clip_lora
+Seed: 42
+Device: cuda
+Backbone: OpenAI CLIP ViT-B/32
+Model Path: models\vit-b-32.pt
+Original CLIP Weights Frozen: Yes
+Text Encoder Frozen: Yes
+Method: LoRA
+Adaptation Side: Vision Encoder
+Target Layers: Visual Transformer MLP (c_fc + c_proj)
+LoRA Rank: 4
+LoRA Alpha: 8.0
+LoRA Dropout: 0.0
+Total Parameters: 151645953
+Trainable LoRA Parameters: 368640
+Trainable Ratio: 0.2431%
+Num Classes: 100
+K-shot: 20
+Train Size: 2000
+Validation Size: 3000
+Test Size: 55000
+Epochs: 100
+Batch Size: 64
+Learning Rate: 0.001
+Weight Decay: 0.0001
+Evaluation Frequency: 5
+Prompt Template: "a photo of a {}"
+Best Validation Accuracy: 88.50%
+Best Epoch: 5
+Final Validation Accuracy: 88.50%
+Validation Mean Class Accuracy: 88.50%
+Test Accuracy: 89.82%
+Test Mean Class Accuracy: 89.82%
+
+======================================================================
+CLIP-Adapter Baseline
+======================================================================
+Experiment: clip_adapter
+Seed: 42
+Device: cuda
+Backbone: OpenAI CLIP ViT-B/32
+Model Path: models\vit-b-32.pt
+CLIP Image Encoder Frozen: Yes
+CLIP Text Encoder Frozen: Yes
+Method: CLIP-Adapter
+Adaptation Side: Visual Feature
+Adapter Type: Bottleneck MLP
+Feature Dimension: 512
+Bottleneck Dimension: 128
+Reduction: 4
+Residual Ratio: 0.2
+Residual Formula: (1-ratio)*original + ratio*adapter
+Total Parameters: 151408385
+Trainable Parameters: 131072
+Trainable Ratio: 0.0866%
+Num Classes: 100
+K-shot: 20
+Train Size: 2000
+Validation Size: 3000
+Test Size: 55000
+Epochs: 50
+Batch Size: 64
+Learning Rate: 0.001
+Weight Decay: 0.0001
+Evaluation Frequency: 5
+Prompt Template: "a photo of a {}"
+Best Validation Accuracy: 79.77%
+Best Epoch: 35
+Final Validation Accuracy: 79.77%
+Validation Mean Class Accuracy: 79.77%
+Test Accuracy: 81.12%
+Test Mean Class Accuracy: 81.12%
+
