@@ -389,8 +389,7 @@ AI 辅助代码实现
 从随机初始化 ResNet18 到 ImageNet 预训练，再到 CLIP 视觉-语言先验，以及 Prompt、Feature Cache、Adapter 和 LoRA 等适配方法，实验结果体现了不同层次先验知识和适配机制在 Few-shot 场景下的作用。
 
 本项目的主要目标不是提出新的 Few-shot 算法，而是通过**统一实验、方法复现、对比分析与工程实现**，建立对现代 Few-shot Learning 方法体系的整体认识，并形成一套可复现、可扩展的实验代码框架。
-"""
 
-print(readme)
+
 
  
