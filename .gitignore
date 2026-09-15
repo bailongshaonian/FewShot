@@ -1,0 +1,23 @@
+# Local datasets and generated image trees
+mini-imagenet/images/
+mini-imagenet/train/
+mini-imagenet/val/
+mini-imagenet/test/
+mini-imagenet_raw/
+
+# Local model weights and checkpoints
+models/
+*.pt
+*.pth
+*.ckpt
+
+# Python/editor/runtime files
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.vscode/
+.idea/
+.DS_Store
+
+# Local experiment logs (the curated log lives in results/)
+*.log

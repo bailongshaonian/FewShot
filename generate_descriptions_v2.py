@@ -14,7 +14,7 @@ CLASS_INDEX_PATH = os.path.join(
     "imagenet_class_index.json"
 )
 
-OUTPUT_PATH = "class_descriptions.json"
+OUTPUT_PATH = os.path.join("mini-imagenet", "class_descriptions.json")
 
 
 # ============================================================

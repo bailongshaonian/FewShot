@@ -131,12 +131,21 @@ a photo of a dog
 | Random Init. ResNet18               |    **28.51%** |
 | ImageNet Pretrained ResNet18        |    **67.35%** |
 | Frozen Backbone + Linear Classifier |    **87.28%** |
+| ProtoNet (Frozen ResNet18)          |    **86.44%** |
+| ProtoNet (From Scratch)             |    **22.08%** |
 | CLIP Zero-shot                      |    **83.75%** |
 | CLIP Linear Probe                   |    **88.65%** |
 | Hard Prompt                         |    **86.98%** |
 | CoOp                                |    **88.93%** |
 | Tip-Adapter                         |    **86.67%** |
+| CLIP-Adapter                        |    **81.12%** |
 | LoRA                                |    **89.82%** |
+
+当前结果来自单个随机种子（42），因此不提供置信区间或统计显著性结论。
+
+![FewShot 方法测试准确率排名](results/01_test_accuracy_ranking.png)
+
+完整实验日志、结构化汇总、其余图表和可复现的可视化代码见 [`results/`](results/)。
 
 ### LoRA 参数效率
 
@@ -219,6 +228,7 @@ LoRA 在仅训练 **0.2431%** 模型参数的情况下获得 **89.82%** 的测�
 FewShot/
 │
 ├── README.md
+├── requirements.txt
 │
 ├── WhiteBox_baseline.py
 │
@@ -243,7 +253,20 @@ FewShot/
 ├── split_dataset.py
 ├── download_resnet.py
 │
-└── ...
+├── mini-imagenet/
+│   ├── imagenet_class_index.json
+│   ├── class_descriptions.json
+│   └── class_descriptions_v1.json
+│
+└── results/
+    ├── results_data.txt
+    ├── experiment_summary.csv
+    ├── 01_test_accuracy_ranking.png
+    ├── 02_validation_test_gap.png
+    ├── 03_clip_parameter_efficiency.png
+    ├── fewshot_visualizations.pdf
+    ├── visualization_report.md
+    └── visualize_results.py
 ```
 
 ### 主要代码说明
@@ -286,6 +309,7 @@ FewShot/
 ```bash
 conda create -n fewshot python=3.10
 conda activate fewshot
+pip install -r requirements.txt
 ```
 
 然后根据具体实验脚本安装所需依赖。
@@ -296,7 +320,7 @@ conda activate fewshot
 
 项目主要使用 Mini-ImageNet 数据集。
 
-由于数据集文件较大，本仓库**不直接提供数据集**。
+由于数据集和模型权重文件较大，本仓库**不直接提供这些文件**。`.gitignore` 会排除图片目录、原始数据、模型权重、缓存和编辑器配置；仓库仅保留类别索引与描述 JSON。
 
 准备数据后，请根据对应实验脚本中的路径配置放置数据。
 
@@ -341,6 +365,12 @@ python strategy_LoRA.py
 ```
 
 实验结果会根据对应脚本的设置保存至指定目录。
+
+重新生成 `results/` 中的图表、CSV、PDF 和分析报告：
+
+```bash
+python results/visualize_results.py
+```
 
 ---
 

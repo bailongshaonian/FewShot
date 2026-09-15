@@ -1,0 +1,13 @@
+﻿method,experiment,family,model,validation_accuracy,test_accuracy,generalization_gap,best_epoch,epochs,k_shot,trainable_parameters,trainable_ratio_percent,training_mode
+Random ResNet18 baseline,white_box_baseline,ResNet baselines,Randomly Initialized ResNet18,29.03,28.51,-0.5199999999999996,95.0,100.0,20,,,trained
+ResNet18 full fine-tune,data_baseline_pretrained_resnet18,ResNet baselines,ImageNet Pretrained ResNet18,67.3,67.35,0.04999999999999716,85.0,100.0,20,,,trained
+ResNet18 linear probe,data_baseline_frozen_pretrained_resnet18,ResNet baselines,ImageNet Pretrained ResNet18,86.33,87.28,0.9500000000000028,60.0,100.0,20,,,trained
+"ProtoNet, frozen ResNet18",model_baseline_frozen_pretrained_protonet,Prototypical networks,ImageNet Pretrained ResNet18,85.83,86.44,0.6099999999999994,,0.0,20,,,trained
+"ProtoNet, from scratch",from_scratch_protonet,Prototypical networks,Randomly Initialized ResNet18,23.5,22.08,-1.4200000000000017,93.0,100.0,5,,,trained
+CLIP zero-shot,clip_zero_shot,CLIP prompting,OpenAI CLIP ViT-B/32,82.4,83.75,1.3499999999999943,,,0,,,Zero-shot Inference
+CLIP linear probe,clip_linear_probe,CLIP adaptation,OpenAI CLIP ViT-B/32,88.13,88.65,0.5200000000000102,65.0,100.0,20,,,trained
+CLIP hard prompt,clip_hard_prompt_zero_shot,CLIP prompting,OpenAI CLIP ViT-B/32,86.2,86.98,0.7800000000000011,,,0,,,Zero-shot Inference
+CLIP CoOp,clip_coop,CLIP adaptation,OpenAI CLIP ViT-B/32,88.5,88.93,0.4300000000000068,10.0,100.0,20,2048.0,,trained
+CLIP Tip-Adapter,clip_tip_adapter,CLIP adaptation,OpenAI CLIP ViT-B/32,85.73,86.67,0.9399999999999977,,,20,,,trained
+CLIP LoRA,clip_lora,CLIP adaptation,OpenAI CLIP ViT-B/32,88.5,89.82,1.3199999999999932,5.0,100.0,20,368640.0,0.2431,trained
+CLIP-Adapter,clip_adapter,CLIP adaptation,OpenAI CLIP ViT-B/32,79.77,81.12,1.3500000000000085,35.0,50.0,20,131072.0,0.0866,trained
