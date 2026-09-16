@@ -20,7 +20,9 @@
 主要使用 **Mini-ImageNet** 进行实验。
 
 * 类别数：100
-* 每类训练样本：20 张
+* 每类训练样本：20 张（使用支持集的方法）
+* 每类验证样本：30 张；每类测试样本：550 张
+* 训练、验证、测试共享 100 个类别，按图片划分；这是固定类别的少样本适配实验
 * 任务：100-way image classification
 * 评价指标：Classification Accuracy
 
@@ -88,7 +90,7 @@ Text → Text Encoder → Text Feature
 a photo of a dog
 ```
 
-扩展为包含类别属性、外观等更加细粒度信息的文本描述。
+扩展为包含 WordNet 词义定义的文本描述；这些定义不保证都只描述视觉属性。
 
 ---
 
@@ -106,7 +108,7 @@ a photo of a dog
 
 ### 2.8 CLIP-Adapter
 
-通过轻量级 Adapter 对 CLIP 的视觉/语义特征进行任务相关的调整，在保留预训练知识的同时学习少量目标任务信息。
+通过轻量级 Adapter 对 CLIP 的视觉/语义特征进行任务相关的调整，在保留预训练知识的同时学习少量目标任务信息。当前实现仅调整视觉特征。
 
 ---
 
@@ -130,18 +132,20 @@ a photo of a dog
 | :---------------------------------- | ------------: |
 | Random Init. ResNet18               |    **28.51%** |
 | ImageNet Pretrained ResNet18        |    **67.35%** |
-| Frozen Backbone + Linear Classifier |    **87.28%** |
+| Frozen Backbone + Linear Classifier |    **87.60%** |
 | ProtoNet (Frozen ResNet18)          |    **86.44%** |
-| ProtoNet (From Scratch)             |    **22.08%** |
+| ProtoNet (From Scratch)             |    **19.55%** |
 | CLIP Zero-shot                      |    **83.75%** |
 | CLIP Linear Probe                   |    **88.65%** |
 | Hard Prompt                         |    **86.98%** |
 | CoOp                                |    **88.93%** |
 | Tip-Adapter                         |    **86.67%** |
-| CLIP-Adapter                        |    **81.12%** |
+| CLIP-Adapter                        |    **89.64%** |
 | LoRA                                |    **89.82%** |
 
-当前结果来自单个随机种子（42），因此不提供置信区间或统计显著性结论。
+当前结果来自单个随机种子（42），因此不提供置信区间或统计显著性结论。各方法共享数据划分，但优化器、增强与训练预算并不完全相同。Zero-shot 和 Hard Prompt 不使用带标签支持图片，Tip-Adapter 使用支持集但不进行梯度训练。
+
+`results/results_data.txt` 每种方法仅保留一份有效记录。CLIP-Adapter 使用修正后的类别映射；Frozen ResNet 同时固定主干权重与 BN 统计量；从头训练 ProtoNet 为每轮 50 个 episode、100 轮、每 5 轮验证一次，最优轮次为 100。
 
 ![FewShot 方法测试准确率排名](results/01_test_accuracy_ranking.png)
 
@@ -169,11 +173,11 @@ LoRA 在本项目实验中取得最高测试准确率：
 
 这说明在训练样本极少的情况下，模型已有的视觉知识能够显著缓解目标任务数据不足的问题。
 
-### 4.2 充分利用预训练特征比直接更新整个模型更加稳定
+### 4.2 本次实验中，冻结预训练主干优于全量微调
 
-冻结预训练视觉 Backbone 后，仅训练分类器即可达到 **87.28%**。
+冻结预训练视觉 Backbone 后，仅训练分类器即可达到 **87.60%**。
 
-这表明在极少样本条件下，直接使用少量数据更新大量模型参数可能导致过拟合，而充分利用已经学习到的通用视觉特征是一种有效策略。
+本次配置下，固定主干权重与 BN 统计量、仅训练分类头优于全量微调的 67.35%。这个结果支持优先利用已有特征，但不能仅凭最终准确率断定全量微调发生过拟合，也不能用单种子结果证明稳定性。
 
 ### 4.3 CLIP 的视觉-语言先验具有较强的迁移能力
 
@@ -181,11 +185,26 @@ CLIP Zero-shot 在完全不使用目标任务训练样本的情况下达到 **83
 
 进一步通过 Linear Probe、Prompt Learning 等方法进行适配，可以继续挖掘预训练模型中的知识。
 
-### 4.4 参数高效微调具有较好的少样本适应能力
+### 4.4 本次实验中，可训练的 CLIP 适配方法取得最高的一组准确率
+
+| 适配方式 | 方法 | Test Accuracy |
+| :--- | :--- | ---: |
+| 参数训练 | LoRA | **89.82%** |
+| 参数训练 | CLIP-Adapter | **89.64%** |
+| 参数训练 | CoOp | **88.93%** |
+| 参数训练 | Linear Probe | **88.65%** |
+| 无参数训练 | Hard Prompt | **86.98%** |
+| 无参数训练 | Tip-Adapter | **86.67%** |
+
+四种可训练适配方法在本次数据划分和配置下都优于 Hard Prompt 与免训练的 Tip-Adapter。这里的区别是是否通过梯度学习任务参数，而不是“有没有超参数”。Hard Prompt 引入 WordNet 类别语义；Tip-Adapter 利用带标签图片的特征缓存，两者不能统称为外部语义知识。
+
+![CLIP 参数训练与免训练方法对比](results/04_clip_adaptation_comparison.png)
+
+### 4.5 参数效率与结论边界
 
 LoRA 在仅训练 **0.2431%** 模型参数的情况下获得 **89.82%** 的测试准确率，为本实验中表现最好的方法。
 
-这说明在少样本场景中，通过低秩参数更新保留大部分预训练知识，同时学习少量任务相关信息，是一种具有较高参数效率的适配方式。
+LoRA 与 CLIP-Adapter 仅相差 **0.18 个百分点**，单次结果不足以确定二者的稳定优劣。现有结果说明轻量参数训练在本次任务中有效，不意味着它在所有数据集、标注预算和超参数配置下都优于免训练方法。
 
 ---
 
@@ -264,6 +283,7 @@ FewShot/
     ├── 01_test_accuracy_ranking.png
     ├── 02_validation_test_gap.png
     ├── 03_clip_parameter_efficiency.png
+    ├── 04_clip_adaptation_comparison.png
     ├── fewshot_visualizations.pdf
     ├── visualization_report.md
     └── visualize_results.py
@@ -295,7 +315,8 @@ FewShot/
 
 项目主要使用：
 
-* Python 3.10
+* Python（最新记录环境：3.14.3）
+* 最新运行记录：PyTorch 2.10.0+cu126、RTX 3060 Laptop GPU
 * PyTorch
 * torchvision
 * CUDA
@@ -304,7 +325,7 @@ FewShot/
 * scikit-learn
 * tqdm
 
-建议使用 Conda 创建独立环境：
+可使用 Conda 创建独立环境（以下为示例，PyTorch/CUDA 需匹配本机环境）：
 
 ```bash
 conda create -n fewshot python=3.10
@@ -364,7 +385,9 @@ python strategy_clip_adapter.py
 python strategy_LoRA.py
 ```
 
-实验结果会根据对应脚本的设置保存至指定目录。
+实验汇总追加到 `results/results_data.txt`。ProtoNet 的配置、逐轮曲线与最优权重写入本地 `runs/protonet/`，不提交 GitHub；`results/` 仅存放整理后的有效结果与可视化。重新运行后，应先人工确认记录有效性并整理重复方法，再生成图表；可视化脚本遇到重复方法会报错，不会按测试准确率自动挑选。
+
+类别描述使用 `generate_descriptions_v2.py` 按 wnid 精确生成。v1 是保留的历史方案，会覆盖同名输出文件，不作为当前结果的生成入口。
 
 重新生成 `results/` 中的图表、CSV、PDF 和分析报告：
 
@@ -386,7 +409,7 @@ python results/visualize_results.py
 
 AI 并未直接决定最终实验方案。
 
-项目的实验框架、方法选择、评价标准和实验设计由本人确定；AI 主要用于代码初稿、调试辅助和局部优化。所有实验均由本人实际运行，并对代码逻辑和实验结果进行检查与验证。
+项目的实验框架、方法选择、评价标准和实验设计由本人确定；AI 主要用于代码初稿、调试辅助和局部优化。实验在本地实际运行，并通过人工检查与 AI 辅助核验确认代码逻辑和结果记录。
 
 特别是在复现论文方法时，重点检查：
 
@@ -419,7 +442,3 @@ AI 辅助代码实现
 从随机初始化 ResNet18 到 ImageNet 预训练，再到 CLIP 视觉-语言先验，以及 Prompt、Feature Cache、Adapter 和 LoRA 等适配方法，实验结果体现了不同层次先验知识和适配机制在 Few-shot 场景下的作用。
 
 本项目的主要目标不是提出新的 Few-shot 算法，而是通过**统一实验、方法复现、对比分析与工程实现**，建立对现代 Few-shot Learning 方法体系的整体认识，并形成一套可复现、可扩展的实验代码框架。
-
-
-
- 

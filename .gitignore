@@ -21,3 +21,7 @@ __pycache__/
 
 # Local experiment logs (the curated log lives in results/)
 *.log
+
+# Local per-run configuration, training curves and checkpoints
+runs/
+results/protonet_runs/

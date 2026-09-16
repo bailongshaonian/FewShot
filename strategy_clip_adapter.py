@@ -187,7 +187,7 @@ def load_clip_model():
 # 4. ImageNet class mapping
 # ============================================================
 
-def load_class_names():
+def load_class_names(dataset_classes):
 
     if not os.path.exists(
         CLASS_INDEX_PATH
@@ -205,19 +205,20 @@ def load_class_names():
 
         class_index = json.load(f)
 
+    synset_to_name = {
+        wnid: name for wnid, name in class_index.values()
+    }
     class_names = []
 
-    for i in range(NUM_CLASSES):
+    # ImageFolder labels follow dataset.classes, not ImageNet's numeric IDs.
+    for wnid in dataset_classes:
 
-        key = str(i)
-
-        if key not in class_index:
-
+        if wnid not in synset_to_name:
             raise KeyError(
-                f"ImageNet class index 中不存在 {key}"
+                f"数据集类别 {wnid} 在 ImageNet 类别映射中不存在"
             )
 
-        wnid, name = class_index[key]
+        name = synset_to_name[wnid]
 
         name = (
             name
@@ -1485,9 +1486,8 @@ def main():
     # 2. Load Class Names
     # ========================================================
 
-    class_names = (
-        load_class_names()
-    )
+    train_dataset, val_dataset, test_dataset = load_datasets(preprocess)
+    class_names = load_class_names(train_dataset.classes)
 
     print(
         "\nClass examples:"
@@ -1506,13 +1506,7 @@ def main():
     # 3. Load Dataset
     # ========================================================
 
-    (
-        train_dataset,
-        val_dataset,
-        test_dataset
-    ) = load_datasets(
-        preprocess
-    )
+    # Datasets were loaded before text construction to preserve label order.
 
 
     # ========================================================

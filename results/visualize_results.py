@@ -4,8 +4,8 @@ Usage:
     python visualize_results.py --input results_data.txt --output-dir .
 
 The script parses repeated ``key: value`` experiment blocks, writes a tidy CSV,
-and produces three figures plus a short Markdown report. It is designed to
-continue working when similarly formatted experiment blocks are appended.
+and produces four figures plus a short Markdown report. The input must contain
+one curated, valid run per method; duplicate methods require explicit curation.
 """
 
 from __future__ import annotations
@@ -24,8 +24,8 @@ from matplotlib.backends.backend_pdf import PdfPages
 COLORS = {
     "ResNet baselines": "#7A5195",
     "Prototypical networks": "#00A6A6",
-    "CLIP prompting": "#F28E2B",
-    "CLIP adaptation": "#4E79A7",
+    "CLIP without parameter training": "#F28E2B",
+    "CLIP with parameter training": "#4E79A7",
 }
 
 
@@ -88,7 +88,9 @@ def display_name(block: dict) -> str:
 
 def method_family(name: str) -> str:
     if name.startswith("CLIP"):
-        return "CLIP prompting" if ("zero-shot" in name or "hard prompt" in name) else "CLIP adaptation"
+        return ("CLIP without parameter training"
+                if name in {"CLIP zero-shot", "CLIP hard prompt", "CLIP Tip-Adapter"}
+                else "CLIP with parameter training")
     if name.startswith("ProtoNet"):
         return "Prototypical networks"
     return "ResNet baselines"
@@ -103,8 +105,10 @@ def to_dataframe(blocks: list[dict]) -> pd.DataFrame:
         if validation is None or test is None:
             continue
         trainable_parameters = block.get("Trainable Parameters", block.get("Trainable LoRA Parameters"))
-        if method == "CLIP CoOp":
-            trainable_parameters = block.get("Trainable Parameters", 2048)
+        parameter_training = method not in {
+            "CLIP zero-shot", "CLIP hard prompt", "CLIP Tip-Adapter",
+            "ProtoNet, frozen ResNet18",
+        }
         rows.append(
             {
                 "method": method,
@@ -113,18 +117,25 @@ def to_dataframe(blocks: list[dict]) -> pd.DataFrame:
                 "model": block.get("Model", block.get("Backbone", "")),
                 "validation_accuracy": float(validation),
                 "test_accuracy": float(test),
-                "generalization_gap": float(test) - float(validation),
+                "test_minus_validation_pp": float(test) - float(validation),
                 "best_epoch": block.get("Best Epoch"),
                 "epochs": block.get("Epochs", block.get("Training Epochs")),
-                "k_shot": block.get("K-shot", block.get("N-shot", 0)),
+                "k_shot": block.get("K-shot", 0),
+                "episode_n_shot": block.get("N-shot"),
+                "seed": block.get("Seed"),
+                "run_id": block.get("Run ID"),
                 "trainable_parameters": trainable_parameters,
                 "trainable_ratio_percent": block.get("Trainable Ratio"),
-                "training_mode": block.get("Training Mode", "trained"),
+                "parameter_training": parameter_training,
+                "training_mode": "trained" if parameter_training else "no parameter training",
             }
         )
     frame = pd.DataFrame(rows)
     if frame.empty:
         raise ValueError("No experiment blocks with validation and test accuracy were found.")
+    if frame["method"].duplicated().any():
+        duplicates = frame.loc[frame["method"].duplicated(), "method"].tolist()
+        raise ValueError(f"Duplicate methods: {duplicates}. Curate valid runs before plotting.")
     return frame
 
 
@@ -183,7 +194,7 @@ def plot_val_test_gap(df: pd.DataFrame, output_dir: Path, pdf: PdfPages) -> None
     ax.scatter(ordered["test_accuracy"], y, s=60, color="#4E79A7", marker="D", label="Test", zorder=3)
     ax.set_yticks(y, ordered["method"])
     ax.set_xlabel("Accuracy (%)")
-    ax.set_title("Validation-to-test generalization", loc="left", fontsize=15, fontweight="bold", pad=12)
+    ax.set_title("Validation and test accuracy", loc="left", fontsize=15, fontweight="bold", pad=12)
     ax.text(0, 1.01, "Lines connect validation and test accuracy for the same method", transform=ax.transAxes, color="#666666")
     left = min(ordered["validation_accuracy"].min(), ordered["test_accuracy"].min()) - 4
     right = max(ordered["validation_accuracy"].max(), ordered["test_accuracy"].max()) + 4
@@ -199,17 +210,19 @@ def plot_val_test_gap(df: pd.DataFrame, output_dir: Path, pdf: PdfPages) -> None
 
 
 def plot_parameter_efficiency(df: pd.DataFrame, output_dir: Path, pdf: PdfPages) -> None:
-    subset = df[df["trainable_parameters"].notna()].copy()
+    subset = df[df["method"].str.startswith("CLIP") & df["trainable_parameters"].notna()].copy()
     subset["trainable_parameters"] = pd.to_numeric(subset["trainable_parameters"])
     fig, ax = plt.subplots(figsize=(9.2, 6.2))
-    ax.scatter(subset["trainable_parameters"], subset["test_accuracy"], s=130, color=COLORS["CLIP adaptation"], edgecolor="white", linewidth=1.2)
+    ax.scatter(subset["trainable_parameters"], subset["test_accuracy"], s=130, color=COLORS["CLIP with parameter training"], edgecolor="white", linewidth=1.2)
     for _, row in subset.iterrows():
         ax.annotate(
             f"{row['method']}\n{int(row['trainable_parameters']):,} params",
             (row["trainable_parameters"], row["test_accuracy"]),
-            xytext=(8, 7), textcoords="offset points", fontsize=9,
+            xytext=(8, -32) if row["method"] == "CLIP-Adapter" else (8, 7),
+            textcoords="offset points", fontsize=9,
         )
     ax.set_xscale("log")
+    ax.set_xlim(subset["trainable_parameters"].min() / 2, subset["trainable_parameters"].max() * 6)
     ax.set_xlabel("Trainable parameters (log scale)")
     ax.set_ylabel("Test accuracy (%)")
     ax.set_title("Parameter-efficient CLIP adaptation", loc="left", fontsize=15, fontweight="bold", pad=12)
@@ -221,11 +234,38 @@ def plot_parameter_efficiency(df: pd.DataFrame, output_dir: Path, pdf: PdfPages)
     finish_figure(fig, output_dir, "03_clip_parameter_efficiency", pdf)
 
 
+def plot_clip_comparison(df: pd.DataFrame, output_dir: Path, pdf: PdfPages) -> None:
+    subset = df[df["method"].str.startswith("CLIP")].sort_values("test_accuracy")
+    fig, ax = plt.subplots(figsize=(11.2, 5.8))
+    y = np.arange(len(subset))
+    bars = ax.barh(y, subset["test_accuracy"], color=[COLORS[f] for f in subset["family"]])
+    ax.set_yticks(y, subset["method"])
+    ax.set_xlim(0, 100)
+    ax.set_xlabel("Test accuracy (%)")
+    ax.set_title("CLIP adaptation: parameter training vs. training-free methods",
+                 loc="left", fontsize=13, fontweight="bold", pad=15)
+    for bar, value in zip(bars, subset["test_accuracy"]):
+        ax.text(value + .6, bar.get_y() + bar.get_height()/2, f"{value:.2f}%", va="center")
+    ax.grid(axis="x", color="#DDDDDD")
+    ax.set_axisbelow(True)
+    ax.spines[["top", "right", "left"]].set_visible(False)
+    handles = [plt.Line2D([0], [0], marker="s", linestyle="", color=COLORS[name], label=name)
+               for name in ["CLIP with parameter training", "CLIP without parameter training"]]
+    ax.set_ylim(-1.7, len(subset) - .4)
+    ax.legend(handles=handles, loc="lower left", frameon=False, fontsize=9)
+    fig.text(.13, .005, "Hard prompt: WordNet descriptions. Tip-Adapter: labeled support-feature cache. Seed 42 only.",
+             fontsize=9, color="#666666")
+    finish_figure(fig, output_dir, "04_clip_adaptation_comparison", pdf)
+
+
 def write_report(df: pd.DataFrame, output_dir: Path) -> None:
     best = df.loc[df["test_accuracy"].idxmax()]
     clip_zero = df.loc[df["method"] == "CLIP zero-shot", "test_accuracy"].iloc[0]
     strongest_non_clip = df.loc[~df["method"].str.startswith("CLIP")].sort_values("test_accuracy", ascending=False).iloc[0]
     gap = best["test_accuracy"] - clip_zero
+    trained = df[df["family"] == "CLIP with parameter training"].sort_values("test_accuracy", ascending=False)
+    training_free = df[df["method"].isin(["CLIP hard prompt", "CLIP Tip-Adapter"])].sort_values("test_accuracy", ascending=False)
+    comparison = "\n".join(f"| {r.method} | {r.test_accuracy:.2f}% |" for r in pd.concat([trained, training_free]).itertuples())
     report = f"""# FewShot experiment visualization summary
 
 Source: `results_data.txt`
@@ -238,11 +278,22 @@ Experiments parsed: **{len(df)}**
 3. The strongest non-CLIP result is **{strongest_non_clip['method']}** at **{strongest_non_clip['test_accuracy']:.2f}%**.
 4. Validation and test accuracy are close for most methods, but these are single-seed results and do not quantify run-to-run uncertainty.
 
+## Parameter training and training-free CLIP adaptation
+
+| Method | Test accuracy |
+| --- | ---: |
+{comparison}
+
+All four tested CLIP methods with parameter training outperform both Hard Prompt and the training-free Tip-Adapter in this run. Their accuracies span **{trained['test_accuracy'].min():.2f}%–{trained['test_accuracy'].max():.2f}%**.
+Hard Prompt adds WordNet descriptions without labeled support images. Tip-Adapter uses a labeled image-feature cache (alpha=1, beta=5), not an external semantic knowledge base. It has hyperparameters but no gradient-based parameter training in this implementation.
+These comparisons describe this dataset, configuration and seed; they do not establish universal superiority or statistical significance. LoRA and CLIP-Adapter differ by only 0.18 percentage points.
+
 ## Generated files
 
 - `01_test_accuracy_ranking.png`: overall comparison and method families.
 - `02_validation_test_gap.png`: validation/test gap for each experiment.
 - `03_clip_parameter_efficiency.png`: accuracy against reported trainable parameters.
+- `04_clip_adaptation_comparison.png`: CLIP parameter-training versus training-free results.
 - `fewshot_visualizations.pdf`: all figures in one multi-page PDF.
 - `experiment_summary.csv`: parsed, analysis-ready experiment table.
 - `visualize_results.py`: reproducible visualization code.
@@ -268,8 +319,9 @@ def main() -> None:
         plot_ranking(frame, args.output_dir, pdf)
         plot_val_test_gap(frame, args.output_dir, pdf)
         plot_parameter_efficiency(frame, args.output_dir, pdf)
+        plot_clip_comparison(frame, args.output_dir, pdf)
     write_report(frame, args.output_dir)
-    print(frame[["method", "validation_accuracy", "test_accuracy", "generalization_gap"]].sort_values("test_accuracy", ascending=False).to_string(index=False))
+    print(frame[["method", "validation_accuracy", "test_accuracy", "test_minus_validation_pp"]].sort_values("test_accuracy", ascending=False).to_string(index=False))
 
 
 if __name__ == "__main__":

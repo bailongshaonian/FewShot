@@ -180,6 +180,9 @@ def train_one_epoch(
 ):
 
     model.train()
+    # Freeze feature-extractor state as well as its learnable parameters.
+    # The classifier remains in training mode.
+    model[0].eval()
 
     total_loss = 0.0
     correct = 0
@@ -361,6 +364,8 @@ def save_results(
         f.write(
             "Backbone: Frozen\n"
         )
+        f.write("Backbone Mode During Training: eval\n")
+        f.write("BatchNorm Running Statistics: Frozen\n")
 
         f.write(
             "Classifier: Linear\n"

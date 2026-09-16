@@ -1,6 +1,12 @@
 import os
 import copy
 import random
+import csv
+import hashlib
+import json
+import platform
+from datetime import datetime
+from pathlib import Path
 import numpy as np
 
 import torch
@@ -45,6 +51,69 @@ LR = 0.001
 WEIGHT_DECAY = 5e-4
 
 SEED = 42
+
+RUNS_DIR = Path("runs") / "protonet"
+
+
+def create_run_record(train_dataset, val_dataset, test_dataset,
+                      train_transform, eval_transform):
+    """Keep configuration and source paired with each independent run."""
+    run_id = "protonet_" + datetime.now().strftime("%Y%m%d_%H%M%S_%f")
+    run_dir = RUNS_DIR / run_id
+    run_dir.mkdir(parents=True, exist_ok=False)
+    source = Path(__file__).read_bytes()
+    config = {
+        "run_id": run_id,
+        "seed": SEED,
+        "num_classes": NUM_CLASSES,
+        "dataset_k_shot": K_SHOT,
+        "episode_n_way": N_WAY,
+        "episode_n_shot": N_SHOT,
+        "episode_n_query": N_QUERY,
+        "episodes_per_epoch": EPISODES_PER_EPOCH,
+        "epochs": EPOCHS,
+        "eval_frequency": EVAL_FREQ,
+        "embedding_batch_size": BATCH_SIZE,
+        "num_workers": NUM_WORKERS,
+        "optimizer": "Adam",
+        "learning_rate": LR,
+        "weight_decay": WEIGHT_DECAY,
+        "device": DEVICE,
+        "amp_enabled": DEVICE == "cuda",
+        "python_version": platform.python_version(),
+        "torch_version": str(torch.__version__),
+        "cuda_version": torch.version.cuda,
+        "data_dir": str(Path(DATA_DIR).resolve()),
+        "class_to_idx": train_dataset.class_to_idx,
+        "split_sizes": {"train": len(train_dataset), "val": len(val_dataset),
+                        "test": len(test_dataset)},
+        "train_transform": repr(train_transform),
+        "eval_transform": repr(eval_transform),
+        "source_sha256": hashlib.sha256(source).hexdigest(),
+        "selection_metric": "validation_accuracy",
+        "bn_policy": "train for episodes; eval for validation/test",
+    }
+    (run_dir / "config.json").write_text(
+        json.dumps(config, ensure_ascii=False, indent=2), encoding="utf-8"
+    )
+    (run_dir / "source.py").write_bytes(source)
+    with (run_dir / "epochs.csv").open("w", newline="", encoding="utf-8") as f:
+        csv.writer(f).writerow([
+            "epoch", "episode_loss", "episode_accuracy", "validation_accuracy",
+            "learning_rate", "best_epoch", "best_validation_accuracy",
+        ])
+    print(f"Run ID: {run_id}\nRun artifacts: {run_dir.resolve()}")
+    return run_dir, config
+
+
+def append_epoch_record(run_dir, epoch, loss, accuracy, val_accuracy,
+                        learning_rate, best_epoch, best_val_accuracy):
+    # Blank validation cells mean no evaluation, not zero accuracy.
+    with (run_dir / "epochs.csv").open("a", newline="", encoding="utf-8") as f:
+        csv.writer(f).writerow([
+            epoch, loss, accuracy, val_accuracy, learning_rate, best_epoch,
+            best_val_accuracy if best_epoch else None,
+        ])
 
 
 # ============================================================
@@ -672,7 +741,8 @@ def save_results(
     test_acc,
     train_size,
     val_size,
-    test_size
+    test_size,
+    run_id=None
 ):
 
     results_dir = "results"
@@ -702,6 +772,10 @@ def save_results(
         f.write(
             "Experiment: from_scratch_protonet\n"
         )
+        if run_id is not None:
+            f.write(f"Run ID: {run_id}\n")
+        f.write(f"Num Classes: {NUM_CLASSES}\n")
+        f.write(f"K-shot: {K_SHOT}\n")
 
         f.write(
             f"Seed: {SEED}\n"
@@ -812,6 +886,14 @@ def save_results(
 # ============================================================
 
 def main():
+
+    set_seed(SEED)
+    if EPOCHS < 1 or EPISODES_PER_EPOCH < 1 or EVAL_FREQ < 1:
+        raise ValueError("Epochs、Episodes per Epoch、Evaluation Frequency 必须为正数")
+    if not (1 <= N_WAY <= NUM_CLASSES) or min(N_SHOT, N_QUERY) < 1:
+        raise ValueError("Episode 的 way/shot/query 配置无效")
+    if N_SHOT + N_QUERY > K_SHOT:
+        raise ValueError("Episode support + query 不能超过每类训练样本数")
 
     print("=" * 70)
     print("Optimized From-scratch ProtoNet Baseline")
@@ -937,6 +1019,11 @@ def main():
     class_indices = build_class_indices(
         train_dataset
     )
+    if any(len(indices) != K_SHOT for indices in class_indices.values()):
+        raise ValueError(f"当前实验要求每个类别恰好有 {K_SHOT} 张训练图片")
+    run_dir, run_config = create_run_record(
+        train_dataset, val_dataset, test_dataset, train_transform, eval_transform
+    )
 
 
     # ========================================================
@@ -998,7 +1085,7 @@ def main():
     # 8. 最佳模型
     # ========================================================
 
-    best_val_acc = 0.0
+    best_val_acc = float("-inf")
     best_epoch = 0
 
     best_weights = copy.deepcopy(
@@ -1015,6 +1102,8 @@ def main():
     )
 
     for epoch in range(EPOCHS):
+
+        val_acc = None
 
         train_loss, train_acc = train_epoch(
             model=model,
@@ -1078,6 +1167,13 @@ def main():
                 best_weights = copy.deepcopy(
                     model.state_dict()
                 )
+                torch.save({
+                    "run_id": run_config["run_id"],
+                    "epoch": best_epoch,
+                    "validation_accuracy": best_val_acc,
+                    "config": run_config,
+                    "state_dict": {k: v.detach().cpu() for k, v in best_weights.items()},
+                }, run_dir / "best_model.pth")
 
             print(
                 f"Epoch [{epoch + 1:03d}/{EPOCHS}] "
@@ -1095,10 +1191,17 @@ def main():
             )
 
 
+        append_epoch_record(
+            run_dir, epoch + 1, train_loss, train_acc, val_acc,
+            optimizer.param_groups[0]["lr"], best_epoch, best_val_acc,
+        )
+
     # ========================================================
     # 10. 恢复最佳模型
     # ========================================================
 
+    if best_epoch == 0:
+        raise RuntimeError("未得到有效验证结果，停止测试和结果保存")
     model.load_state_dict(
         best_weights
     )
@@ -1172,13 +1275,25 @@ def main():
     # 13. 保存
     # ========================================================
 
+    summary = {
+        "run_id": run_config["run_id"],
+        "status": "completed",
+        "best_epoch": best_epoch,
+        "best_validation_accuracy": best_val_acc,
+        "test_accuracy": test_acc,
+        "checkpoint": "best_model.pth",
+    }
+    (run_dir / "summary.json").write_text(
+        json.dumps(summary, ensure_ascii=False, indent=2), encoding="utf-8"
+    )
     save_results(
         best_val_acc=best_val_acc,
         best_epoch=best_epoch,
         test_acc=test_acc,
         train_size=len(train_dataset),
         val_size=len(val_dataset),
-        test_size=len(test_dataset)
+        test_size=len(test_dataset),
+        run_id=run_config["run_id"]
     )
 
 

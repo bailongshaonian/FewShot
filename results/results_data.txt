@@ -53,6 +53,8 @@ Seed: 42
 Device: cuda
 Model: ImageNet Pretrained ResNet18
 Backbone: Frozen
+Backbone Mode During Training: eval
+BatchNorm Running Statistics: Frozen
 Classifier: Linear
 Pretrained Weights: models\resnet18_pretrained.pth
 Data Augmentation: RandomResizedCrop + RandomHorizontalFlip + RandAugment
@@ -66,9 +68,9 @@ Weight Decay: 0.0005
 Train Size: 2000
 Validation Size: 3000
 Test Size: 55000
-Best Validation Accuracy: 86.33%
-Best Epoch: 60
-Test Accuracy: 87.28%
+Best Validation Accuracy: 87.10%
+Best Epoch: 65
+Test Accuracy: 87.60%
 
 ======================================================================
 Model-level Baseline
@@ -98,6 +100,9 @@ Episodic Meta-training: No
 From-scratch ProtoNet Baseline
 ======================================================================
 Experiment: from_scratch_protonet
+Run ID: protonet_20260916_193109_894991
+Num Classes: 100
+K-shot: 20
 Seed: 42
 Device: cuda
 Model: Randomly Initialized ResNet18
@@ -109,17 +114,18 @@ Pretrained Weights: None
 N-way: 5
 N-shot: 5
 N-query: 10
-Episodes per Epoch: 100
+Episodes per Epoch: 50
 Epochs: 100
-Episodic Meta-training: Yes
+Evaluation Frequency: 5
 Learning Rate: 0.001
 Weight Decay: 0.0005
 Train Size: 2000
 Validation Size: 3000
 Test Size: 55000
-Best Validation Accuracy: 23.50%
-Best Epoch: 93
-Test Accuracy: 22.08%
+Episodic Meta-training: Yes
+Best Validation Accuracy: 20.10%
+Best Epoch: 100
+Test Accuracy: 19.55%
 
 ======================================================================
 Foundation Model Zero-shot Baseline
@@ -330,10 +336,9 @@ Learning Rate: 0.001
 Weight Decay: 0.0001
 Evaluation Frequency: 5
 Prompt Template: "a photo of a {}"
-Best Validation Accuracy: 79.77%
+Best Validation Accuracy: 88.47%
 Best Epoch: 35
-Final Validation Accuracy: 79.77%
-Validation Mean Class Accuracy: 79.77%
-Test Accuracy: 81.12%
-Test Mean Class Accuracy: 81.12%
-
+Final Validation Accuracy: 88.47%
+Validation Mean Class Accuracy: 88.47%
+Test Accuracy: 89.64%
+Test Mean Class Accuracy: 89.64%
